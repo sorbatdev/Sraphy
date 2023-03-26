@@ -1,8 +1,8 @@
-
 #include "log.h"
+
+#include "editor.h"
 
 int main()
 {
-	LOG_DEBUG("Hello Sraphy");
-	return 0;
+	return sraphy::Run();
 }
