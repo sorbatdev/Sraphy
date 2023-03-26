@@ -5,6 +5,14 @@
         "fmt",
         "glfw3",
         "glm",
-        "glad"
+        "glad",
+        {
+            "name": "imgui",
+            "features": [
+                "docking-experimental",
+                "glfw-binding",
+                "opengl3-binding"
+            ]
+        }
     ]
 }

@@ -21,6 +21,7 @@ target_link_libraries(
             glfw
             glm::glm
             glad::glad
+            imgui::imgui
 )
 
 target_precompile_headers(Sraphy PRIVATE "srpch.h")

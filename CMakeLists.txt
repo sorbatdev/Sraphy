@@ -23,6 +23,7 @@ find_package(fmt CONFIG REQUIRED) # fmt::fmt
 find_package(glfw3 CONFIG REQUIRED) # glfw
 find_package(glm CONFIG REQUIRED) # glm::glm
 find_package(glad CONFIG REQUIRED) # glad::glad
+find_package(imgui CONFIG REQUIRED)
 
 # Include sub-projects.
 add_subdirectory("Source")
