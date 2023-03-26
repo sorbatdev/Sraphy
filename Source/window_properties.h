@@ -12,6 +12,7 @@ namespace sraphy
 
         bool decorated{};
         bool fullscreen{};
+        bool maximized{};
 
         bool    vsync{};
         int32_t refreshRate{};

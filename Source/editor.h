@@ -12,6 +12,6 @@ namespace sraphy
         Editor();
         ~Editor();
     private:
-        void Update(app_update& e);
+        void update(app_update& e);
     };
 }

@@ -36,6 +36,11 @@ namespace sraphy
             // Raise the event with the window handle so we know which window
             // to close.
             EventBus::RaiseEvent<window_close>(p_Window);
+
+            // Main window closing needs to happen at the end of the app. Not
+            // by cakking destroywindow but glfwTerminate.
+            if (p_Window != WindowManager::AppWindowHandle())
+                WindowManager::CloseWindow(p_Window);
         }
 
         static void WindowFocusCallback(GLFWwindow* p_Window, int32_t p_Focused)
@@ -44,7 +49,7 @@ namespace sraphy
             {
                 glfwMakeContextCurrent(p_Window);
             }
-            EventBus::RaiseEvent<window_focus>(p_Focused);
+            EventBus::RaiseEvent<window_focus>(p_Window, p_Focused);
         }
 
         static void WindowSizeCallback(GLFWwindow* /*p_Window*/, int32_t p_Width, int32_t p_Height)
@@ -128,6 +133,9 @@ namespace sraphy
 
     WindowManager::WindowManager()
     {
+        SUB_TO_EVENT_MEM_FUN(app_late_update, update);
+        SUB_TO_EVENT_MEM_FUN(window_focus, on_focus);
+
         if (!glfwInit())
         {
             LOG_ERROR("GLFW could not be initialized.");
@@ -137,13 +145,16 @@ namespace sraphy
 
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         GLFWvidmode const* mode = glfwGetVideoMode(monitor);
+        
+        using namespace std::string_view_literals;
         window_properties win_props{
             .order = 0, // the first window, so it's order is 0
             .width = mode->width,
             .height = mode->height,
-            .title = "Sraphy",
+            .title = "Sraphy"sv,
             .decorated = true,
             .fullscreen = false,
+            .maximized = true,
             .vsync = true,
             .refreshRate = mode->refreshRate
         };
@@ -167,14 +178,17 @@ namespace sraphy
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         GLFWvidmode const* mode = glfwGetVideoMode(monitor);
 
-        p_Props.order = m_WindowGuids.size();
+        p_Props.order = s_Instance->m_WindowGuids.size();
 
         int64_t guid = CreateGuid();
-        m_WindowGuids.push_back(guid);
-        m_WindowProps.push_back(p_Props);
+        s_Instance->m_WindowGuids.push_back(guid);
+        s_Instance->m_WindowProps.push_back(p_Props);
 
         auto* win_handle = glfwCreateWindow(p_Props.width, p_Props.height, p_Props.title.c_str(), nullptr, nullptr);
-        m_WindowHandles.push_back(win_handle);
+        s_Instance->m_WindowHandles.push_back(win_handle);
+
+        if(p_Props.maximized)
+            glfwMaximizeWindow(win_handle);
 
         glfwSetWindowUserPointer(win_handle, &p_Props);
         int32_t pos_x, pos_y;
@@ -192,8 +206,6 @@ namespace sraphy
             glfwGetWindowSize(win_handle, &window_width, &window_height);
             p_Props.width = window_width;
             p_Props.height = window_height;
-
-            glfwMaximizeWindow(win_handle);
         }
 
         glfwSwapInterval(p_Props.vsync);
@@ -219,74 +231,173 @@ namespace sraphy
     {
         auto index = find_index_with_guid(p_Guid);
 
-        if (index == m_WindowGuids.size())
+        if (index == s_Instance->m_WindowGuids.size())
         {
             LOG_ERROR("[WindowManager::CloseWindow] Could not find a window associated with the guid: {}", p_Guid);
             return;
         }
 
-        glfwDestroyWindow(m_WindowHandles[index]);
+        glfwDestroyWindow(s_Instance->m_WindowHandles[index]);
 
-        auto& prop   = m_WindowProps[index];
-        auto* handle = m_WindowHandles[index];
+        auto prop   = s_Instance->m_WindowProps[index];
+        auto* handle = s_Instance->m_WindowHandles[index];
 
-        auto it0 = std::ranges::remove(m_WindowGuids, p_Guid);
-        auto it1 = std::ranges::remove(m_WindowHandles, handle);
-        auto it2 = std::remove(m_WindowProps.begin(), m_WindowProps.end(), prop);
+        std::erase(s_Instance->m_WindowGuids, p_Guid);
+        std::erase(s_Instance->m_WindowHandles, handle);
+        std::erase(s_Instance->m_WindowProps, prop);
+    }
+
+    void WindowManager::CloseWindow(GLFWwindow* p_WinHandle)
+    {
+        auto index = find_index_with_handle(p_WinHandle);
+
+        if (index == s_Instance->m_WindowHandles.size())
+        {
+            LOG_ERROR("[WindowManager::CloseWindow] Could not find a window associated with the given handle!");
+            return;
+        }
+
+        glfwDestroyWindow(p_WinHandle);
+
+        auto guid = s_Instance->m_WindowGuids[index];
+        auto prop = s_Instance->m_WindowProps[index];
+
+        std::erase(s_Instance->m_WindowGuids, guid);
+        std::erase(s_Instance->m_WindowHandles, p_WinHandle);
+        std::erase(s_Instance->m_WindowProps, prop);
     }
 
     int64_t WindowManager::AppWindowGuid()
     {
-        return m_WindowGuids[0];
+        return s_Instance->m_WindowGuids[0];
     }
 
     GLFWwindow* WindowManager::AppWindowHandle()
     {
-        return m_WindowHandles[0];
+        return s_Instance->m_WindowHandles[0];
     }
 
     bool WindowManager::AppWindowShouldClose()
     {
-        return glfwWindowShouldClose(m_WindowHandles[0]);
+        return glfwWindowShouldClose(s_Instance->m_WindowHandles[0]);
     }
 
     void WindowManager::AppWindowRequestFocus()
     {
-        glfwMakeContextCurrent(m_WindowHandles[0]);
+        s_Instance->m_ActiveWindowIndex = 0;
+        glfwMakeContextCurrent(s_Instance->m_WindowHandles[0]);
+    }
+
+    window_properties WindowManager::GetWindowProperties(int64_t p_Guid)
+    {
+        auto index = find_index_with_guid(p_Guid);
+
+        if (index == s_Instance->m_WindowGuids.size())
+        {
+            LOG_ERROR("[WindowManager::GetWindowShouldClose] Could not find a window associated with the guid: {}", p_Guid);
+            return {};
+        }
+
+        return s_Instance->m_WindowProps[index];
+    }
+
+    GLFWwindow* WindowManager::GetWindowHandle(int64_t p_Guid)
+    {
+        auto index = find_index_with_guid(p_Guid);
+
+        if (index == s_Instance->m_WindowGuids.size())
+        {
+            LOG_ERROR("[WindowManager::GetWindowShouldClose] Could not find a window associated with the guid: {}", p_Guid);
+            return nullptr;
+        }
+
+        return s_Instance->m_WindowHandles[index];
+    }
+
+    int64_t WindowManager::GetWindowGuid(GLFWwindow* p_Handle)
+    {
+        auto index = find_index_with_handle(p_Handle);
+
+        if (index == s_Instance->m_WindowHandles.size())
+        {
+            LOG_ERROR("[WindowManager::on_focus] The Window Manager does not own the window to focus on it.");
+            return INT_MIN;
+        }
+
+        return s_Instance->m_WindowGuids[index];
+    }
+
+    GLFWwindow* WindowManager::GetFocusedWindow()
+    {
+        return s_Instance->m_WindowHandles[s_Instance->m_ActiveWindowIndex];
     }
 
     void WindowManager::RequestFocus(int64_t p_Guid)
     {
         auto index = find_index_with_guid(p_Guid);
 
-        if (index == m_WindowGuids.size())
+        if (index == s_Instance->m_WindowGuids.size())
         {
             LOG_ERROR("[WindowManager::GetWindowShouldClose] Could not find a window associated with the guid: {}", p_Guid);
             return;
         }
 
-        glfwMakeContextCurrent(m_WindowHandles[index]);
+        s_Instance->m_ActiveWindowIndex = index;
+        glfwMakeContextCurrent(s_Instance->m_WindowHandles[index]);
     }
 
     bool WindowManager::GetWindowShouldClose(int64_t p_Guid)
     {
         auto index = find_index_with_guid(p_Guid);
 
-        if (index == m_WindowGuids.size())
+        if (index == s_Instance->m_WindowGuids.size())
         {
             LOG_ERROR("[WindowManager::GetWindowShouldClose] Could not find a window associated with the guid: {}", p_Guid);
             return true;
         }
 
-        return glfwWindowShouldClose(m_WindowHandles[index]);
+        return glfwWindowShouldClose(s_Instance->m_WindowHandles[index]);
+    }
+
+    void WindowManager::update(app_late_update& e)
+    {
+        glfwPollEvents();
+        glfwSwapBuffers(m_WindowHandles[m_ActiveWindowIndex]);
+    }
+
+    void WindowManager::on_focus(window_focus& e)
+    {
+        auto index = find_index_with_handle(static_cast<GLFWwindow*>(e.winHandle));
+
+        if (index == m_WindowHandles.size())
+        {
+            LOG_ERROR("[WindowManager::on_focus] The Window Manager does not own the window to focus on it.");
+            return;
+        }
+
+        m_ActiveWindowIndex = index;
     }
 
     std::size_t WindowManager::find_index_with_guid(int64_t p_Guid)
     {
         std::size_t i{};
-        for (; i < m_WindowGuids.size(); ++i)
+        for (; i < s_Instance->m_WindowGuids.size(); ++i)
         {
-            if (m_WindowGuids[i] == p_Guid)
+            if (s_Instance->m_WindowGuids[i] == p_Guid)
+            {
+                break;
+            }
+        }
+
+        return i;
+    }
+
+    std::size_t WindowManager::find_index_with_handle(GLFWwindow* p_Window)
+    {
+        std::size_t i{};
+        for (; i < s_Instance->m_WindowHandles.size(); ++i)
+        {
+            if (s_Instance->m_WindowHandles[i] == p_Window)
             {
                 break;
             }
