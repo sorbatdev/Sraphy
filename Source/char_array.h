@@ -196,7 +196,7 @@ namespace sraphy
         }
 
     private:
-        char m_Elems[Size];
+        char m_Elems[Size]{0};
         std::size_t m_RealSize{};
     };
 }// namespace sraphy

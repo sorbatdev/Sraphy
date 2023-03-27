@@ -1,7 +1,4 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
-# and include sub-projects here.
-#
-cmake_minimum_required (VERSION 3.24)
+﻿cmake_minimum_required (VERSION 3.24)
 
 project(
     "Sraphy"
@@ -25,5 +22,18 @@ find_package(glm CONFIG REQUIRED) # glm::glm
 find_package(glad CONFIG REQUIRED) # glad::glad
 find_package(imgui CONFIG REQUIRED)
 
+if(MSVC)
+    string(REPLACE "/Zi" "/ZI" CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
+    string(REPLACE "/Zi" "/ZI" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+        
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /INCREMENTAL")
+    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /INCREMENTAL")
+endif()
+
 # Include sub-projects.
 add_subdirectory("Source")
+
+install(
+    DIRECTORY   Resources
+    DESTINATION ${CMAKE_CURRENT_LIST_DIR}
+)

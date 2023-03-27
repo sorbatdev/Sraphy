@@ -36,18 +36,18 @@ namespace sraphy
                 }
             }();
 
-            LOG_TRACE("OpenGL Context");
+            LOG_TRACE("OpenGL Context\n");
             switch (p_Severity)
             {
             case GL_DEBUG_SEVERITY_HIGH:
             case GL_DEBUG_SEVERITY_MEDIUM:
-                LOG_ERROR("{0} on {1},\n{2}", message_type, message_source, p_Message);
+                LOG_ERROR("{0} on {1}, {2}", message_type, message_source, p_Message);
                 break;
             case GL_DEBUG_SEVERITY_LOW:
-                LOG_WARN("{0} on {1},\n{2}", message_type, message_source, p_Message);
+                LOG_WARN("{0} on {1}, {2}", message_type, message_source, p_Message);
                 break;
             case GL_DEBUG_SEVERITY_NOTIFICATION:
-                LOG_INFO("Notification: {0}, Source: {1},\n{2}", message_type, message_source, p_Message);
+                LOG_INFO("Notification: {0}, Source: {1}, {2}", message_type, message_source, p_Message);
                 break;
             }
         }
